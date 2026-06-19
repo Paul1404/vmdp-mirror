@@ -11,20 +11,30 @@ asset — so you can pull it at GitHub speeds instead.
 
 ## Download
 
-**Latest (recommended):**
+Each command resolves the current release's ISO and downloads it under its
+real, versioned name (e.g. `VMDP-WIN-2.5.5.iso`) — so it keeps working across
+version bumps without editing the URL.
+
+**Linux / macOS** — `curl` (capital `-O` keeps the upstream filename):
 
 ```sh
-curl -fL -o vmdp.iso "$(curl -fsSL https://api.github.com/repos/Paul1404/vmdp-mirror/releases/latest | grep -oE 'https://[^"]+\.iso"' | tr -d '"' | head -n1)"
+curl -fLO "$(curl -fsSL https://api.github.com/repos/Paul1404/vmdp-mirror/releases/latest | grep -oE 'https://[^"]+\.iso"' | tr -d '"' | head -n1)"
 ```
 
-…or with `wget`:
+…or `wget` (keeps the filename by default):
 
 ```sh
-wget -O vmdp.iso "$(curl -fsSL https://api.github.com/repos/Paul1404/vmdp-mirror/releases/latest | grep -oE 'https://[^"]+\.iso"' | tr -d '"' | head -n1)"
+wget "$(curl -fsSL https://api.github.com/repos/Paul1404/vmdp-mirror/releases/latest | grep -oE 'https://[^"]+\.iso"' | tr -d '"' | head -n1)"
 ```
 
-The command resolves the current release's ISO asset and downloads it, so it
-keeps working across version bumps without editing the URL.
+**Windows (PowerShell)** — `Invoke-RestMethod` parses the JSON natively, so no
+text-munging is needed:
+
+```powershell
+$a = (Invoke-RestMethod https://api.github.com/repos/Paul1404/vmdp-mirror/releases/latest).assets | Where-Object name -like *.iso
+$ProgressPreference = 'SilentlyContinue'   # makes the download much faster
+Invoke-WebRequest $a.browser_download_url -OutFile $a.name
+```
 
 **Pinned to a specific version** (browse [Releases](https://github.com/Paul1404/vmdp-mirror/releases) for tags):
 
@@ -36,11 +46,24 @@ wget https://github.com/Paul1404/vmdp-mirror/releases/download/v2.5.5.7.1/VMDP-W
 
 Each release ships a `*.iso.sha256` alongside the ISO:
 
+On Linux / macOS:
+
 ```sh
 api=https://api.github.com/repos/Paul1404/vmdp-mirror/releases/latest
 curl -fLO "$(curl -fsSL "$api" | grep -oE 'https://[^"]+\.iso"'        | tr -d '"' | head -n1)"
 curl -fLO "$(curl -fsSL "$api" | grep -oE 'https://[^"]+\.iso\.sha256"' | tr -d '"' | head -n1)"
 sha256sum -c VMDP-WIN-*.iso.sha256
+```
+
+On Windows (PowerShell), compare the hashes directly:
+
+```powershell
+$assets = (Invoke-RestMethod https://api.github.com/repos/Paul1404/vmdp-mirror/releases/latest).assets
+$ProgressPreference = 'SilentlyContinue'
+$assets | ForEach-Object { Invoke-WebRequest $_.browser_download_url -OutFile $_.name }
+$want = (Get-Content (Get-ChildItem *.iso.sha256)).Split(' ')[0]
+$got  = (Get-FileHash (Get-ChildItem *.iso) -Algorithm SHA256).Hash
+if ($got -ieq $want) { "OK: $got" } else { "MISMATCH`n want $want`n got  $got" }
 ```
 
 ## How it works
