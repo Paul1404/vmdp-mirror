@@ -14,13 +14,13 @@ asset — so you can pull it at GitHub speeds instead.
 **Latest (recommended):**
 
 ```sh
-curl -fL -o vmdp.iso "$(curl -fsSL https://api.github.com/repos/Paul1404/vmdp-mirror/releases/latest | grep -o 'https://[^"]*\.iso')"
+curl -fL -o vmdp.iso "$(curl -fsSL https://api.github.com/repos/Paul1404/vmdp-mirror/releases/latest | grep -oE 'https://[^"]+\.iso"' | tr -d '"' | head -n1)"
 ```
 
 …or with `wget`:
 
 ```sh
-wget -O vmdp.iso "$(curl -fsSL https://api.github.com/repos/Paul1404/vmdp-mirror/releases/latest | grep -o 'https://[^"]*\.iso')"
+wget -O vmdp.iso "$(curl -fsSL https://api.github.com/repos/Paul1404/vmdp-mirror/releases/latest | grep -oE 'https://[^"]+\.iso"' | tr -d '"' | head -n1)"
 ```
 
 The command resolves the current release's ISO asset and downloads it, so it
@@ -37,8 +37,9 @@ wget https://github.com/Paul1404/vmdp-mirror/releases/download/v2.5.5.7.1/VMDP-W
 Each release ships a `*.iso.sha256` alongside the ISO:
 
 ```sh
-curl -fLO "$(curl -fsSL https://api.github.com/repos/Paul1404/vmdp-mirror/releases/latest | grep -o 'https://[^"]*\.iso')"
-curl -fLO "$(curl -fsSL https://api.github.com/repos/Paul1404/vmdp-mirror/releases/latest | grep -o 'https://[^"]*\.iso\.sha256')"
+api=https://api.github.com/repos/Paul1404/vmdp-mirror/releases/latest
+curl -fLO "$(curl -fsSL "$api" | grep -oE 'https://[^"]+\.iso"'        | tr -d '"' | head -n1)"
+curl -fLO "$(curl -fsSL "$api" | grep -oE 'https://[^"]+\.iso\.sha256"' | tr -d '"' | head -n1)"
 sha256sum -c VMDP-WIN-*.iso.sha256
 ```
 
