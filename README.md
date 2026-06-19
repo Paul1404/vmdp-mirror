@@ -9,6 +9,36 @@ which is *extremely* slow. This repo polls the upstream image daily and, when a
 new version appears, extracts the ISO and republishes it as a GitHub Release
 asset — so you can pull it at GitHub speeds instead.
 
+## Install on Windows (one-liner)
+
+Run these **inside the Windows guest, in an elevated PowerShell** (right-click →
+*Run as administrator*). Each downloads the latest ISO, mounts it, runs the
+vendor installer unattended, then cleans up. The drivers are WHQL-signed, so
+there are no trust prompts.
+
+**VirtIO drivers + QEMU guest agent (recommended — installs everything):**
+
+```powershell
+$ProgressPreference='SilentlyContinue'; $iso="$env:TEMP\vmdp.iso"; $a=(irm https://api.github.com/repos/Paul1404/vmdp-mirror/releases/latest).assets | ? name -like *.iso; iwr $a.browser_download_url -OutFile $iso; $d=(Mount-DiskImage $iso -PassThru | Get-Volume).DriveLetter; Start-Process "${d}:\setup.exe" '/lic_accepted /no_reboot' -Wait; Dismount-DiskImage $iso; del $iso
+```
+
+**QEMU guest agent only** (installs `qemu-ga` plus the `virtio_serial` channel
+driver it needs — nothing else):
+
+```powershell
+$ProgressPreference='SilentlyContinue'; $iso="$env:TEMP\vmdp.iso"; $a=(irm https://api.github.com/repos/Paul1404/vmdp-mirror/releases/latest).assets | ? name -like *.iso; iwr $a.browser_download_url -OutFile $iso; $d=(Mount-DiskImage $iso -PassThru | Get-Volume).DriveLetter; Start-Process "${d}:\setup.exe" '/qemu-ga /lic_accepted /no_reboot' -Wait; Dismount-DiskImage $iso; del $iso
+```
+
+> `setup.exe` auto-detects the OS, architecture, and hypervisor (KVM/Xen) and
+> installs the right drivers — no per-OS path picking needed. Swap `/no_reboot`
+> for `/auto_reboot` to let it reboot when required, or add `/force` to
+> reinstall over existing drivers. The guest agent needs the VM to expose a
+> qemu guest-agent channel (`org.qemu.guest_agent.0`), which Harvester / KubeVirt
+> add automatically.
+
+Prefer a GUI? [Download the ISO](#download), double-click to mount it, and run
+`setup.exe` from its root.
+
 ## Download
 
 Each command resolves the current release's ISO and downloads it under its
