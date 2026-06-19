@@ -1,0 +1,47 @@
+name: Mirror VMDP ISO
+
+# Mirrors the latest SUSE VMDP ISO to a GitHub Release.
+# Idempotent: if the current upstream version is already published, this is a no-op.
+
+on:
+  schedule:
+    # Daily at 06:17 UTC. VMDP updates rarely, so this is just a cheap poll —
+    # the version check bails out in seconds when nothing changed.
+    - cron: '17 6 * * *'
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/mirror.yml'
+      - 'scripts/**'
+
+permissions:
+  contents: write   # create releases and upload assets
+
+concurrency:
+  group: mirror-vmdp
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Mirror latest VMDP ISO
+        id: mirror
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: ./scripts/mirror.sh
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### VMDP mirror"
+            echo ""
+            echo "- Upstream version: \`${{ steps.mirror.outputs.version || 'unknown' }}\`"
+            echo "- Published new release: \`${{ steps.mirror.outputs.published || 'n/a' }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,4 @@
+# The ISO is published only as a release asset — never commit it.
+*.iso
+*.iso.sha256
+/out/
