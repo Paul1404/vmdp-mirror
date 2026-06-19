@@ -16,7 +16,8 @@ on:
       - 'scripts/**'
 
 permissions:
-  contents: write   # create releases and upload assets
+  contents: write   # create releases, upload assets, push keepalive commit
+  issues: write     # open a failure issue if the mirror can't run
 
 concurrency:
   group: mirror-vmdp
@@ -27,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Mirror latest VMDP ISO
         id: mirror
@@ -45,3 +46,36 @@ jobs:
             echo "- Upstream version: \`${{ steps.mirror.outputs.version || 'unknown' }}\`"
             echo "- Published new release: \`${{ steps.mirror.outputs.published || 'n/a' }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # GitHub auto-disables scheduled workflows after 60 days with no commits.
+      # VMDP can go months without an update, so nudge an empty commit before
+      # we get close to the threshold. Token pushes don't re-trigger workflows.
+      - name: Keepalive
+        if: github.event_name == 'schedule'
+        run: |
+          age_days=$(( ( $(date +%s) - $(git log -1 --format=%ct) ) / 86400 ))
+          echo "Days since last commit: ${age_days}"
+          if [ "${age_days}" -ge 45 ]; then
+            git config user.name  "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit --allow-empty -m "chore: keepalive (prevent scheduled-run auto-disable)"
+            git push
+          fi
+
+      # The only time a human needs to look: the mirror genuinely couldn't run
+      # (e.g. upstream changed the registry/image/label format). Surface it as a
+      # single tracking issue instead of failing silently.
+      - name: Report failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          title="VMDP mirror workflow failed"
+          existing=$(gh issue list --state open --search "${title} in:title" --json number --jq '.[0].number')
+          if [ -n "${existing}" ]; then
+            gh issue comment "${existing}" --body "Failed again on $(date -u +%FT%TZ): ${run_url}"
+          else
+            gh issue create --title "${title}" \
+              --body "The VMDP mirror workflow failed (run: ${run_url}). This usually means the upstream registry, image layout, or version label changed. The workflow will keep retrying on schedule; close this issue once it's healthy again."
+          fi

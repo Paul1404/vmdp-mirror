@@ -83,6 +83,21 @@ if ($got -ieq $want) { "OK: $got" } else { "MISMATCH`n want $want`n got  $got" }
 It uses only `curl`, `jq`, `tar`, and `gh` — no Docker daemon and no registry
 credentials. The only token in play is the workflow's automatic `GITHUB_TOKEN`.
 
+### Self-maintaining
+
+This repo is designed to need zero attention:
+
+- **No-op when unchanged** — the daily poll exits in seconds if the current
+  version is already mirrored.
+- **Stays scheduled** — a keepalive step makes an empty commit before GitHub's
+  60-day inactivity cutoff would auto-disable the cron.
+- **Keeps actions current** — [Dependabot](.github/dependabot.yml) bumps the
+  GitHub Actions it uses, and [auto-merge](.github/workflows/dependabot-automerge.yml)
+  merges those PRs without intervention.
+- **Speaks up only when needed** — if the mirror genuinely can't run (e.g. SUSE
+  changes the registry or label format), it opens a single tracking issue rather
+  than failing silently.
+
 ### Run it yourself
 
 ```sh
