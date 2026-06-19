@@ -108,7 +108,9 @@ if ($got -ieq $want) { "OK: $got" } else { "MISMATCH`n want $want`n got  $got" }
    Same version ⇒ no-op.
 3. **Mirror** — otherwise it downloads the single image layer (~24 MB gzip),
    extracts `disk/VMDP-WIN-*.iso`, and publishes it plus a SHA256 checksum as a
-   new GitHub Release marked `latest`.
+   new GitHub Release marked `latest`. The release notes embed the matching
+   upstream changelog, mirrored from [`SUSE/vmdp`](https://github.com/SUSE/vmdp/releases)
+   (falling back to a link if no matching version is published there).
 
 It uses only `curl`, `jq`, `tar`, and `gh` — no Docker daemon and no registry
 credentials. The only token in play is the workflow's automatic `GITHUB_TOKEN`.

@@ -34,6 +34,8 @@ TAG="${VMDP_TAG:-latest}"
 AUTH_REALM="https://scc.suse.com/api/registry/authorize"
 AUTH_SERVICE="SUSE Linux Docker Registry"
 GH_REPO="${GH_REPO:-Paul1404/vmdp-mirror}"
+# Upstream publishes per-version release notes here; we mirror them into ours.
+UPSTREAM_NOTES_REPO="${UPSTREAM_NOTES_REPO:-SUSE/vmdp}"
 
 ACCEPT_MANIFEST=$(printf '%s,' \
   "application/vnd.docker.distribution.manifest.v2+json" \
@@ -141,12 +143,39 @@ release_exists() {
   gh release view "v${version}" --repo "${GH_REPO}" >/dev/null 2>&1
 }
 
+# Echoes a markdown "Upstream release notes" section for an ISO version such
+# as 2.5.5, mirrored from UPSTREAM_NOTES_REPO's matching GitHub release. Tries
+# the exact version then trims trailing components (e.g. 2.5.6.2 -> 2.5.6).
+# Falls back to a link if nothing matches, so a notes lookup never blocks a release.
+upstream_notes() {
+  local isover="$1"
+  local base="https://github.com/${UPSTREAM_NOTES_REPO}/releases"
+  local candidate="${isover}" body
+  printf '## Upstream release notes\n\n'
+  while :; do
+    if body=$(gh api "repos/${UPSTREAM_NOTES_REPO}/releases/tags/v${candidate}" --jq '.body' 2>/dev/null) \
+       && [ -n "${body}" ] && [ "${body}" != "null" ]; then
+      printf 'Mirrored from [`%s` v%s](%s/tag/v%s):\n\n%s\n' \
+        "${UPSTREAM_NOTES_REPO}" "${candidate}" "${base}" "${candidate}" "${body}"
+      return 0
+    fi
+    case "${candidate}" in
+      *.*.*.*) candidate="${candidate%.*}" ;;   # trim one trailing .N and retry
+      *) break ;;
+    esac
+  done
+  printf 'No matching upstream release was found for `%s`. See the full changelog at <%s>.\n' \
+    "${isover}" "${base}"
+}
+
 publish_release() {
   local version="$1" iso="$2"
-  local name sum
+  local name sum isover
   name=$(basename "${iso}")
   ( cd "$(dirname "${iso}")" && sha256sum "${name}" > "${name}.sha256" )
   sum=$(cut -d' ' -f1 < "${iso}.sha256")
+  # Derive the upstream ISO version from the filename: VMDP-WIN-2.5.5.iso -> 2.5.5
+  isover="${name#VMDP-WIN-}"; isover="${isover%.iso}"
 
   local notes
   notes=$(cat <<EOF
@@ -164,6 +193,8 @@ faster downloads. See the [README](https://github.com/${GH_REPO}#readme) for
 download instructions.
 
 Upstream: <https://www.suse.com/download/suse-vmdp/>
+
+$(upstream_notes "${isover}")
 EOF
 )
 
